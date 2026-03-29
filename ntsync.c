@@ -61,6 +61,7 @@ static struct cdev *ntsync_dev;
 /* Forward declarations */
 static fo_ioctl_t    ntsync_obj_ioctl;
 static fo_close_t    ntsync_obj_close;
+static fo_stat_t     ntsync_obj_stat;
 
 static struct fileops ntsync_obj_ops = {
     .fo_read = invfo_rdwr,
@@ -69,12 +70,18 @@ static struct fileops ntsync_obj_ops = {
     .fo_ioctl = ntsync_obj_ioctl,
     .fo_poll = invfo_poll,
     .fo_kqfilter = invfo_kqfilter,
-    .fo_stat = badfo_stat,
+    .fo_stat = ntsync_obj_stat,
     .fo_close = ntsync_obj_close,
     .fo_chmod = invfo_chmod,
     .fo_chown = invfo_chown,
     .fo_sendfile = invfo_sendfile,
 };
+
+static int
+ntsync_obj_stat(struct file *fp, struct stat *sb, struct ucred *active_cred)
+{
+    return (ENXIO);
+}
 
 static d_open_t      ntsync_open;
 static d_ioctl_t     ntsync_ioctl;
