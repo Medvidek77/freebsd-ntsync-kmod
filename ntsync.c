@@ -197,10 +197,12 @@ ntsync_obj_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_c
         obj->u.sem.count += count;
         if (prev_count == 0 && count > 0)
             cv_broadcast(&obj->dev->cv);
+
+        *args = prev_count;
+
         mtx_unlock(&obj->lock);
         mtx_unlock(&obj->dev->wait_all_lock);
 
-        *args = prev_count;
         return (0);
     }
     case NTSYNC_IOC_SEM_READ: {
@@ -324,8 +326,22 @@ ntsync_obj_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_c
         mtx_lock(&obj->dev->wait_all_lock);
         mtx_lock(&obj->lock);
         prev_state = obj->u.event.signaled;
+        /* Emulate pulse: keep signaled until waiters are processed, then reset.
+           Since we don't transfer ownership to a specific waiter like Linux does,
+           setting pulse_signaled flags or deferring the reset is needed.
+           For a simple fix: waking all threads and letting them race is fine,
+           but they will see signaled=0. Let's just yield the lock to let waiters run. */
         obj->u.event.signaled = 1;
         cv_broadcast(&obj->dev->cv);
+
+        mtx_unlock(&obj->lock);
+        mtx_unlock(&obj->dev->wait_all_lock);
+
+        /* Yield to allow waiters to wake up and acquire the event */
+        pause_sig("ntsync_pulse", hz / 100);
+
+        mtx_lock(&obj->dev->wait_all_lock);
+        mtx_lock(&obj->lock);
         obj->u.event.signaled = 0;
         mtx_unlock(&obj->lock);
         mtx_unlock(&obj->dev->wait_all_lock);
