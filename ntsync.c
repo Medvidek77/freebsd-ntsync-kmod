@@ -547,7 +547,15 @@ ntsync_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct threa
             goto alloc_fail;
         }
 
-        td->td_retval[0] = fd;
+        /* Write fd to the corresponding user struct */
+        if (cmd == NTSYNC_IOC_CREATE_SEM) {
+            ((struct ntsync_sem_args *)data)->fd = fd;
+        } else if (cmd == NTSYNC_IOC_CREATE_MUTEX) {
+            ((struct ntsync_mutex_args *)data)->fd = fd;
+        } else if (cmd == NTSYNC_IOC_CREATE_EVENT) {
+            ((struct ntsync_event_args *)data)->fd = fd;
+        }
+
         return (0);
 
     alloc_fail:

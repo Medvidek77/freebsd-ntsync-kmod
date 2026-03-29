@@ -6,16 +6,19 @@
 #include <sys/ioccom.h>
 
 struct ntsync_sem_args {
+    uint32_t    fd;
     uint32_t    count;
     uint32_t    max;
 };
 
 struct ntsync_mutex_args {
+    uint32_t    fd;
     uint32_t    owner;
     uint32_t    count;
 };
 
 struct ntsync_event_args {
+    uint32_t    fd;
     uint32_t    manual;
     uint32_t    signaled;
 };
