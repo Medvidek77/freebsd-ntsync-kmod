@@ -41,14 +41,14 @@ struct ntsync_wait_args {
 #define NTSYNC_IOC_CREATE_MUTEX  _IOW ('N', 0x84, struct ntsync_mutex_args)
 #define NTSYNC_IOC_CREATE_EVENT  _IOW ('N', 0x87, struct ntsync_event_args)
 
-#define NTSYNC_IOC_SEM_POST      _IOWR('N', 0x81, uint32_t)
+#define NTSYNC_IOC_SEM_RELEASE   _IOWR('N', 0x81, uint32_t)
 #define NTSYNC_IOC_SEM_READ      _IOR ('N', 0x8b, struct ntsync_sem_args)
 #define NTSYNC_IOC_MUTEX_UNLOCK  _IOWR('N', 0x85, struct ntsync_mutex_args)
 #define NTSYNC_IOC_MUTEX_KILL    _IOW ('N', 0x86, uint32_t)
 #define NTSYNC_IOC_MUTEX_READ    _IOR ('N', 0x8c, struct ntsync_mutex_args)
-#define NTSYNC_IOC_EVENT_SET     _IOWR('N', 0x88, uint32_t)
-#define NTSYNC_IOC_EVENT_RESET   _IOWR('N', 0x89, uint32_t)
-#define NTSYNC_IOC_EVENT_PULSE   _IOWR('N', 0x8a, uint32_t)
+#define NTSYNC_IOC_EVENT_SET     _IOR ('N', 0x88, uint32_t)
+#define NTSYNC_IOC_EVENT_RESET   _IOR ('N', 0x89, uint32_t)
+#define NTSYNC_IOC_EVENT_PULSE   _IOR ('N', 0x8a, uint32_t)
 #define NTSYNC_IOC_EVENT_READ    _IOR ('N', 0x8d, struct ntsync_event_args)
 
 #endif /* _NTSYNC_UAPI_H */
