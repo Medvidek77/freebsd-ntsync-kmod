@@ -3,10 +3,7 @@
 #define _NTSYNC_UAPI_H
 
 #include <sys/types.h>
-
-#ifdef __FreeBSD__
 #include <sys/ioccom.h>
-#endif
 
 struct ntsync_sem_args {
     uint32_t    count;
@@ -38,20 +35,20 @@ struct ntsync_wait_args {
 
 #define NTSYNC_MAX_WAIT_COUNT 64
 
-#define NTSYNC_IOC_CREATE_SEM    0x40084e80U
-#define NTSYNC_IOC_WAIT_ANY      0xc0204e82U
-#define NTSYNC_IOC_WAIT_ALL      0xc0204e83U
-#define NTSYNC_IOC_CREATE_MUTEX  0x40084e84U
-#define NTSYNC_IOC_CREATE_EVENT  0x40084e87U
+#define NTSYNC_IOC_CREATE_SEM    _IOW ('N', 0x80, struct ntsync_sem_args)
+#define NTSYNC_IOC_WAIT_ANY      _IOWR('N', 0x82, struct ntsync_wait_args)
+#define NTSYNC_IOC_WAIT_ALL      _IOWR('N', 0x83, struct ntsync_wait_args)
+#define NTSYNC_IOC_CREATE_MUTEX  _IOW ('N', 0x84, struct ntsync_mutex_args)
+#define NTSYNC_IOC_CREATE_EVENT  _IOW ('N', 0x87, struct ntsync_event_args)
 
-#define NTSYNC_IOC_SEM_RELEASE   0xc0044e81U
-#define NTSYNC_IOC_MUTEX_UNLOCK  0xc0084e85U
-#define NTSYNC_IOC_MUTEX_KILL    0x40044e86U
-#define NTSYNC_IOC_EVENT_SET     0x80044e88U
-#define NTSYNC_IOC_EVENT_RESET   0x80044e89U
-#define NTSYNC_IOC_EVENT_PULSE   0x80044e8aU
-#define NTSYNC_IOC_SEM_READ      0x80084e8bU
-#define NTSYNC_IOC_MUTEX_READ    0x80084e8cU
-#define NTSYNC_IOC_EVENT_READ    0x80084e8dU
+#define NTSYNC_IOC_SEM_RELEASE   _IOWR('N', 0x81, uint32_t)
+#define NTSYNC_IOC_SEM_READ      _IOR ('N', 0x8b, struct ntsync_sem_args)
+#define NTSYNC_IOC_MUTEX_UNLOCK  _IOWR('N', 0x85, struct ntsync_mutex_args)
+#define NTSYNC_IOC_MUTEX_KILL    _IOW ('N', 0x86, uint32_t)
+#define NTSYNC_IOC_MUTEX_READ    _IOR ('N', 0x8c, struct ntsync_mutex_args)
+#define NTSYNC_IOC_EVENT_SET     _IOR ('N', 0x88, uint32_t)
+#define NTSYNC_IOC_EVENT_RESET   _IOR ('N', 0x89, uint32_t)
+#define NTSYNC_IOC_EVENT_PULSE   _IOR ('N', 0x8a, uint32_t)
+#define NTSYNC_IOC_EVENT_READ    _IOR ('N', 0x8d, struct ntsync_event_args)
 
 #endif /* _NTSYNC_UAPI_H */
