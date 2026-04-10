@@ -78,7 +78,6 @@ static struct cdev *ntsync_dev;
 static fo_ioctl_t    ntsync_obj_ioctl;
 static fo_close_t    ntsync_obj_close;
 static fo_stat_t     ntsync_obj_stat;
-static fo_fill_kinfo_t ntsync_obj_fill_kinfo;
 
 static struct fileops ntsync_obj_ops = {
     .fo_read = invfo_rdwr,
@@ -92,24 +91,15 @@ static struct fileops ntsync_obj_ops = {
     .fo_chmod = invfo_chmod,
     .fo_chown = invfo_chown,
     .fo_sendfile = invfo_sendfile,
-    .fo_fill_kinfo = ntsync_obj_fill_kinfo,
-    .fo_flags = DFLAG_PASSABLE,
 };
 
 static int
 ntsync_obj_stat(struct file *fp, struct stat *sb, struct ucred *active_cred)
 {
-    bzero(sb, sizeof(*sb));
-    sb->st_mode = S_IFCHR | 0666;
-    /* Fake stat block so wineserver doesn't get ENXIO */
-    return (0);
+    return (ENXIO);
 }
 
-static int
-ntsync_obj_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp)
-{
-    return (0);
-}
+
 
 static d_open_t      ntsync_open;
 static d_ioctl_t     ntsync_ioctl;
@@ -134,7 +124,7 @@ ntsync_obj_get_fd(struct thread *td, struct ntsync_obj *obj, int *fdp)
     if (error)
         return (error);
 
-    finit(fp, FREAD | FWRITE, DTYPE_DEV, obj, &ntsync_obj_ops);
+    finit(fp, FREAD | FWRITE, DTYPE_NONE, obj, &ntsync_obj_ops);
 
     *fdp = fd;
     fdrop(fp, td);
