@@ -93,6 +93,7 @@ static struct fileops ntsync_obj_ops = {
     .fo_chown = invfo_chown,
     .fo_sendfile = invfo_sendfile,
     .fo_fill_kinfo = ntsync_obj_fill_kinfo,
+    .fo_flags = DFLAG_PASSABLE,
 };
 
 static int
