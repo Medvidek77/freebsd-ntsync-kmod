@@ -493,16 +493,16 @@ static void test_ioctl_numbers(void)
      * type='N'=0x4e, uint32=4, ntsync_wait_args=32
      */
     struct { unsigned long actual; unsigned long expected; const char *name; } checks[] = {
-        { NTSYNC_IOC_CREATE_SEM,   0x80084e80UL,                    "CREATE_SEM"   },
+        { NTSYNC_IOC_CREATE_SEM,   0x40084e80UL,                    "CREATE_SEM"   },
         { NTSYNC_IOC_WAIT_ANY,     0xc0284e82UL,                    "WAIT_ANY"     },
         { NTSYNC_IOC_WAIT_ALL,     0xc0284e83UL,                    "WAIT_ALL"     },
-        { NTSYNC_IOC_CREATE_MUTEX, 0x80084e84UL,                    "CREATE_MUTEX" },
-        { NTSYNC_IOC_CREATE_EVENT, 0x80084e87UL,                    "CREATE_EVENT" },
+        { NTSYNC_IOC_CREATE_MUTEX, 0x40084e84UL,                    "CREATE_MUTEX" },
+        { NTSYNC_IOC_CREATE_EVENT, 0x40084e87UL,                    "CREATE_EVENT" },
         { NTSYNC_IOC_SEM_RELEASE,  0xc0044e81UL,                    "SEM_RELEASE"  },
         { NTSYNC_IOC_MUTEX_UNLOCK, 0xc0084e85UL,                    "MUTEX_UNLOCK" },
-        { NTSYNC_IOC_EVENT_SET,    0x40044e88UL,                    "EVENT_SET"    },  /* _IOR! */
-        { NTSYNC_IOC_EVENT_RESET,  0x40044e89UL,                    "EVENT_RESET"  },  /* _IOR! */
-        { NTSYNC_IOC_EVENT_PULSE,  0x40044e8aUL,                    "EVENT_PULSE"  },  /* _IOR! */
+        { NTSYNC_IOC_EVENT_SET,    0x80044e88UL,                    "EVENT_SET"    },  /* _IOR! */
+        { NTSYNC_IOC_EVENT_RESET,  0x80044e89UL,                    "EVENT_RESET"  },  /* _IOR! */
+        { NTSYNC_IOC_EVENT_PULSE,  0x80044e8aUL,                    "EVENT_PULSE"  },  /* _IOR! */
     };
 
     int ok = 1;

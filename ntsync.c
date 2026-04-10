@@ -201,6 +201,7 @@ ntsync_obj_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_c
         mtx_unlock(&obj->dev->wait_all_lock);
 
         *args = prev_count;
+        printf("ntsync: [pid=%d] SEM_RELEASE prev_count=%u added=%u\n", td->td_proc->p_pid, prev_count, count);
         return (0);
     }
     case NTSYNC_IOC_SEM_READ: {
@@ -239,6 +240,7 @@ ntsync_obj_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_c
         }
         mtx_unlock(&obj->lock);
         mtx_unlock(&obj->dev->wait_all_lock);
+        if (!error) printf("ntsync: [pid=%d] MUTEX_UNLOCK owner=%u count=%u\n", td->td_proc->p_pid, args->owner, obj->u.mutex.count);
         return (error);
     }
     case NTSYNC_IOC_MUTEX_KILL: {
@@ -297,6 +299,7 @@ ntsync_obj_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_c
         mtx_unlock(&obj->dev->wait_all_lock);
 
         *args = prev_state;
+        printf("ntsync: [pid=%d] EVENT_SET prev_state=%u\n", td->td_proc->p_pid, prev_state);
         return (0);
     }
     case NTSYNC_IOC_EVENT_RESET: {
@@ -313,6 +316,7 @@ ntsync_obj_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_c
         mtx_unlock(&obj->dev->wait_all_lock);
 
         *args = prev_state;
+        printf("ntsync: [pid=%d] EVENT_RESET prev_state=%u\n", td->td_proc->p_pid, prev_state);
         return (0);
     }
     case NTSYNC_IOC_EVENT_PULSE: {
@@ -456,25 +460,42 @@ ntsync_wait_any(struct ntsync_device *dev, struct thread *td, struct ntsync_wait
     int i, error = 0, acquired_idx = -1;
     uint64_t timeout_ns = args->timeout;
     int ownerdead = 0;
+    uint32_t total_count = args->count + (args->alert ? 1 : 0);
 
     if (args->pad || (args->flags & ~NTSYNC_WAIT_REALTIME))
         return (EINVAL);
 
-    if (args->count == 0 || args->count > NTSYNC_MAX_WAIT_COUNT)
+    if (args->count > NTSYNC_MAX_WAIT_COUNT)
         return (EINVAL);
 
-    fds = malloc(args->count * sizeof(uint32_t), M_NTSYNC, M_WAITOK);
-    error = copyin((void *)(uintptr_t)args->objs, fds, args->count * sizeof(uint32_t));
-    if (error) {
-        free(fds, M_NTSYNC);
+    if (total_count == 0) {
+        if (timeout_ns == 0)
+            return (ETIMEDOUT);
+
+        mtx_lock(&dev->wait_all_lock);
+        error = ntsync_wait_timeout(&dev->cv, &dev->wait_all_lock, timeout_ns, args->flags);
+        mtx_unlock(&dev->wait_all_lock);
+        if (error == ERESTART) error = EINTR;
         return (error);
     }
 
-    objs = malloc(args->count * sizeof(struct ntsync_obj *), M_NTSYNC, M_WAITOK | M_ZERO);
-    fps = malloc(args->count * sizeof(struct file *), M_NTSYNC, M_WAITOK | M_ZERO);
+    fds = malloc(total_count * sizeof(uint32_t), M_NTSYNC, M_WAITOK);
+    if (args->count > 0) {
+        error = copyin((void *)(uintptr_t)args->objs, fds, args->count * sizeof(uint32_t));
+        if (error) {
+            free(fds, M_NTSYNC);
+            return (error);
+        }
+    }
+    if (args->alert) {
+        fds[args->count] = args->alert;
+    }
+
+    objs = malloc(total_count * sizeof(struct ntsync_obj *), M_NTSYNC, M_WAITOK | M_ZERO);
+    fps = malloc(total_count * sizeof(struct file *), M_NTSYNC, M_WAITOK | M_ZERO);
 
     /* Lookup all objects */
-    for (i = 0; i < args->count; i++) {
+    for (i = 0; i < total_count; i++) {
         error = ntsync_get_obj(td, fds[i], &objs[i], &fps[i]);
         if (error) {
             goto out;
@@ -490,7 +511,7 @@ ntsync_wait_any(struct ntsync_device *dev, struct thread *td, struct ntsync_wait
     /* Wait loop */
     for (;;) {
         /* Check if any object can be acquired */
-        for (i = 0; i < args->count; i++) {
+        for (i = 0; i < total_count; i++) {
             int acq = ntsync_try_acquire(objs[i], args->owner);
             if (acq == 1 || acq == -EOWNERDEAD) {
                 acquired_idx = i;
@@ -527,7 +548,7 @@ ntsync_wait_any(struct ntsync_device *dev, struct thread *td, struct ntsync_wait
 
 out:
     /* Drop file references */
-    for (i = 0; i < args->count; i++) {
+    for (i = 0; i < total_count; i++) {
         if (fps[i] != NULL)
             fdrop(fps[i], td);
     }
@@ -546,25 +567,42 @@ ntsync_wait_all(struct ntsync_device *dev, struct thread *td, struct ntsync_wait
     int i, error = 0;
     uint64_t timeout_ns = args->timeout;
     int ownerdead = 0;
+    uint32_t total_count = args->count + (args->alert ? 1 : 0);
 
     if (args->pad || (args->flags & ~NTSYNC_WAIT_REALTIME))
         return (EINVAL);
 
-    if (args->count == 0 || args->count > NTSYNC_MAX_WAIT_COUNT)
+    if (args->count > NTSYNC_MAX_WAIT_COUNT)
         return (EINVAL);
 
-    fds = malloc(args->count * sizeof(uint32_t), M_NTSYNC, M_WAITOK);
-    error = copyin((void *)(uintptr_t)args->objs, fds, args->count * sizeof(uint32_t));
-    if (error) {
-        free(fds, M_NTSYNC);
+    if (total_count == 0) {
+        if (timeout_ns == 0)
+            return (ETIMEDOUT);
+
+        mtx_lock(&dev->wait_all_lock);
+        error = ntsync_wait_timeout(&dev->cv, &dev->wait_all_lock, timeout_ns, args->flags);
+        mtx_unlock(&dev->wait_all_lock);
+        if (error == ERESTART) error = EINTR;
         return (error);
     }
 
-    objs = malloc(args->count * sizeof(struct ntsync_obj *), M_NTSYNC, M_WAITOK | M_ZERO);
-    fps = malloc(args->count * sizeof(struct file *), M_NTSYNC, M_WAITOK | M_ZERO);
+    fds = malloc(total_count * sizeof(uint32_t), M_NTSYNC, M_WAITOK);
+    if (args->count > 0) {
+        error = copyin((void *)(uintptr_t)args->objs, fds, args->count * sizeof(uint32_t));
+        if (error) {
+            free(fds, M_NTSYNC);
+            return (error);
+        }
+    }
+    if (args->alert) {
+        fds[args->count] = args->alert;
+    }
+
+    objs = malloc(total_count * sizeof(struct ntsync_obj *), M_NTSYNC, M_WAITOK | M_ZERO);
+    fps = malloc(total_count * sizeof(struct file *), M_NTSYNC, M_WAITOK | M_ZERO);
 
     /* Lookup all objects */
-    for (i = 0; i < args->count; i++) {
+    for (i = 0; i < total_count; i++) {
         error = ntsync_get_obj(td, fds[i], &objs[i], &fps[i]);
         if (error) {
             goto out;
@@ -582,31 +620,45 @@ ntsync_wait_all(struct ntsync_device *dev, struct thread *td, struct ntsync_wait
         int all_signaled = 1;
         ownerdead = 0;
 
-        /* Atomically check if ALL objects are signaled */
-        for (i = 0; i < args->count; i++) {
-            struct ntsync_obj *obj = objs[i];
-            int acq = 0;
-
-            mtx_lock(&obj->lock);
-            switch (obj->type) {
-            case NTSYNC_TYPE_SEM:
-                if (obj->u.sem.count > 0) acq = 1;
+        /* If there's an alert event, it acts as a "wait any" interrupting the wait_all */
+        if (args->alert) {
+            int acq = ntsync_try_acquire(objs[args->count], args->owner);
+            if (acq == 1 || acq == -EOWNERDEAD) {
+                args->index = args->count;
+                error = (acq == -EOWNERDEAD) ? EOWNERDEAD : 0;
                 break;
-            case NTSYNC_TYPE_MUTEX:
-                if (obj->u.mutex.owner == 0 || obj->u.mutex.owner == args->owner) {
-                    acq = 1;
+            }
+        }
+
+        /* Atomically check if ALL main objects are signaled */
+        if (args->count > 0) {
+            for (i = 0; i < args->count; i++) {
+                struct ntsync_obj *obj = objs[i];
+                int acq = 0;
+
+                mtx_lock(&obj->lock);
+                switch (obj->type) {
+                case NTSYNC_TYPE_SEM:
+                    if (obj->u.sem.count > 0) acq = 1;
+                    break;
+                case NTSYNC_TYPE_MUTEX:
+                    if (obj->u.mutex.owner == 0 || obj->u.mutex.owner == args->owner) {
+                        acq = 1;
+                    }
+                    break;
+                case NTSYNC_TYPE_EVENT:
+                    if (obj->u.event.signaled) acq = 1;
+                    break;
                 }
-                break;
-            case NTSYNC_TYPE_EVENT:
-                if (obj->u.event.signaled) acq = 1;
-                break;
-            }
-            mtx_unlock(&obj->lock);
+                mtx_unlock(&obj->lock);
 
-            if (!acq) {
-                all_signaled = 0;
-                break; /* fast fail if any is not signaled */
+                if (!acq) {
+                    all_signaled = 0;
+                    break; /* fast fail if any is not signaled */
+                }
             }
+        } else {
+            all_signaled = 0; /* Just sleep if no main objects, or wait for alert */
         }
 
         /* If all signaled, acquire them all */
@@ -661,7 +713,7 @@ ntsync_wait_all(struct ntsync_device *dev, struct thread *td, struct ntsync_wait
 
 out:
     /* Drop file references */
-    for (i = 0; i < args->count; i++) {
+    for (i = 0; i < total_count; i++) {
         if (fps[i] != NULL)
             fdrop(fps[i], td);
     }
@@ -729,20 +781,20 @@ ntsync_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag, struct thre
             obj->type = NTSYNC_TYPE_SEM;
             obj->u.sem.count = args->count;
             obj->u.sem.max = args->max;
-            printf("ntsync: Created SEM count=%u max=%u\n", args->count, args->max);
+            printf("ntsync: [pid=%d] Created SEM count=%u max=%u\n", td->td_proc->p_pid, args->count, args->max);
         } else if (cmd == NTSYNC_IOC_CREATE_MUTEX) {
             struct ntsync_mutex_args *args = (struct ntsync_mutex_args *)data;
             obj->type = NTSYNC_TYPE_MUTEX;
             obj->u.mutex.owner = args->owner;
             obj->u.mutex.count = args->count;
             obj->u.mutex.abandoned = 0;
-            printf("ntsync: Created MUTEX owner=%u count=%u\n", args->owner, args->count);
+            printf("ntsync: [pid=%d] Created MUTEX owner=%u count=%u\n", td->td_proc->p_pid, args->owner, args->count);
         } else if (cmd == NTSYNC_IOC_CREATE_EVENT) {
             struct ntsync_event_args *args = (struct ntsync_event_args *)data;
             obj->type = NTSYNC_TYPE_EVENT;
             obj->u.event.manual = args->manual;
             obj->u.event.signaled = args->signaled;
-            printf("ntsync: Created EVENT manual=%u signaled=%u\n", args->manual, args->signaled);
+            printf("ntsync: [pid=%d] Created EVENT manual=%u signaled=%u\n", td->td_proc->p_pid, args->manual, args->signaled);
         }
 
         error = ntsync_obj_get_fd(td, obj, &fd);
@@ -760,11 +812,11 @@ ntsync_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag, struct thre
         return (error);
 
     case NTSYNC_IOC_WAIT_ANY:
-        printf("ntsync: NTSYNC_IOC_WAIT_ANY called\n");
+        printf("ntsync: [pid=%d] WAIT_ANY count=%u alert=%u\n", td->td_proc->p_pid, ((struct ntsync_wait_args *)data)->count, ((struct ntsync_wait_args *)data)->alert);
         return ntsync_wait_any(dev, td, (struct ntsync_wait_args *)data);
 
     case NTSYNC_IOC_WAIT_ALL:
-        printf("ntsync: NTSYNC_IOC_WAIT_ALL called\n");
+        printf("ntsync: [pid=%d] WAIT_ALL count=%u alert=%u\n", td->td_proc->p_pid, ((struct ntsync_wait_args *)data)->count, ((struct ntsync_wait_args *)data)->alert);
         return ntsync_wait_all(dev, td, (struct ntsync_wait_args *)data);
 
     default:
@@ -793,6 +845,7 @@ ntsync_modevent(module_t mod, int type, void *arg)
         break;
 
     case MOD_UNLOAD:
+        /* Prevent new IOCTLs/opens by destroying the device node */
         destroy_dev(ntsync_dev);
         printf("ntsync: module unloaded.\n");
         break;
