@@ -78,6 +78,7 @@ static struct cdev *ntsync_dev;
 static fo_ioctl_t    ntsync_obj_ioctl;
 static fo_close_t    ntsync_obj_close;
 static fo_stat_t     ntsync_obj_stat;
+static fo_fill_kinfo_t ntsync_obj_fill_kinfo;
 
 static struct fileops ntsync_obj_ops = {
     .fo_read = invfo_rdwr,
