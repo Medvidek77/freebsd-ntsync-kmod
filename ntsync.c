@@ -91,12 +91,16 @@ static struct fileops ntsync_obj_ops = {
     .fo_chmod = invfo_chmod,
     .fo_chown = invfo_chown,
     .fo_sendfile = invfo_sendfile,
+    .fo_fill_kinfo = invfo_fill_kinfo,
 };
 
 static int
 ntsync_obj_stat(struct file *fp, struct stat *sb, struct ucred *active_cred)
 {
-    return (ENXIO);
+    bzero(sb, sizeof(*sb));
+    sb->st_mode = S_IFCHR | 0666;
+    /* Fake stat block so wineserver doesn't get ENXIO */
+    return (0);
 }
 
 static d_open_t      ntsync_open;
@@ -122,7 +126,7 @@ ntsync_obj_get_fd(struct thread *td, struct ntsync_obj *obj, int *fdp)
     if (error)
         return (error);
 
-    finit(fp, FREAD | FWRITE, DTYPE_NONE, obj, &ntsync_obj_ops);
+    finit(fp, FREAD | FWRITE, DTYPE_DEV, obj, &ntsync_obj_ops);
 
     *fdp = fd;
     fdrop(fp, td);
