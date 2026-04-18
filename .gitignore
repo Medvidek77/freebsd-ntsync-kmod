@@ -1,0 +1,20 @@
+# Build artifacts
+*.o
+*.ko
+*.depend.*
+export_syms
+
+# Symlinks created during build
+machine
+i386
+x86
+
+# Generated headers
+opt_global.h
+
+# Core dumps and temporary files
+*.core
+[0-9]*
+
+# Binaries
+test
