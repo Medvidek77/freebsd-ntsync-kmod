@@ -1,4 +1,7 @@
-/* ntsync_uapi.h - FreeBSD port */
+/*
+ * ntsync_uapi.h - FreeBSD port
+ * User-space API for NT synchronization primitive emulation.
+ */
 #ifndef _NTSYNC_UAPI_H
 #define _NTSYNC_UAPI_H
 
@@ -21,23 +24,26 @@ struct ntsync_event_args {
 
 #define NTSYNC_WAIT_REALTIME 0x1
 
+/* 
+ * Memory layout strictly matches the upstream Linux/Proton uAPI
+ * to ensure ABI compatibility.
+ */
 struct ntsync_wait_args {
     uint64_t    timeout;
     uint64_t    objs;       /* pointer to uint32_t array of fds */
     uint32_t    count;
-    uint32_t    index;      /* out: which obj woke us */
-    uint32_t    flags;
     uint32_t    owner;
+    uint32_t    index;      /* out: which obj woke us */
     uint32_t    alert;
+    uint32_t    flags;
     uint32_t    pad;
 };
 
 #define NTSYNC_MAX_WAIT_COUNT 64
 
 /*
- * IOCTL numbers must exactly match the upstream Linux definitions
- * since Wine/Proton uses them directly. FreeBSD's _IOW/_IOR macros
- * use different bit layouts and direction bits.
+ * Native FreeBSD IOCTL definitions.
+ * Used when Wine/Proton is compiled natively for FreeBSD.
  */
 #define NTSYNC_IOC_CREATE_SEM    0x80084e80
 #define NTSYNC_IOC_WAIT_ANY      0xc0284e82
@@ -54,5 +60,21 @@ struct ntsync_wait_args {
 #define NTSYNC_IOC_EVENT_RESET   0x40044e89
 #define NTSYNC_IOC_EVENT_PULSE   0x40044e8a
 #define NTSYNC_IOC_EVENT_READ    0x40084e8d
+
+/*
+ * Linux compatible IOCTL definitions.
+ * Used for running unmodified Linux Proton binaries via Linuxator.
+ * Note: _IOWR macros (0xc0...) are binary compatible between Linux and FreeBSD.
+ */
+#define NTSYNC_IOC_CREATE_SEM_LINUX    0x40084e80
+#define NTSYNC_IOC_CREATE_MUTEX_LINUX  0x40084e84
+#define NTSYNC_IOC_CREATE_EVENT_LINUX  0x40084e87
+#define NTSYNC_IOC_MUTEX_KILL_LINUX    0x40044e86
+#define NTSYNC_IOC_SEM_READ_LINUX      0x80084e8b
+#define NTSYNC_IOC_MUTEX_READ_LINUX    0x80084e8c
+#define NTSYNC_IOC_EVENT_SET_LINUX     0x80044e88
+#define NTSYNC_IOC_EVENT_RESET_LINUX   0x80044e89
+#define NTSYNC_IOC_EVENT_PULSE_LINUX   0x80044e8a
+#define NTSYNC_IOC_EVENT_READ_LINUX    0x80084e8d
 
 #endif /* _NTSYNC_UAPI_H */
