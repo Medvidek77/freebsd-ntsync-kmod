@@ -1,9 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * FreeBSD ntsync.ko - NT synchronization primitive emulation
  * Ported from Linux drivers/misc/ntsync.c
  *
- * Emulates Windows NT synchronization primitives in kernel-space
- * to provide accurate semantics and high performance for Wine/Proton.
+ * Copyright (C) 2024 Elizabeth Figura <zfigura@codeweavers.com>
+ * FreeBSD port by Medvidek77
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
  */
 
 #include <sys/param.h>
